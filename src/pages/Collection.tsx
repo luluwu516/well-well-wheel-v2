@@ -13,14 +13,32 @@ export function Collection() {
   async function handleExport() {
     const blob = await exportAll();
     const json = JSON.stringify(blob, null, 2);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `well-well-wheel-${stamp}.json`;
+    const count = `${blob.games.length} game${blob.games.length === 1 ? "" : "s"}`;
+
+    // On mobile, hand the file to the OS share sheet (Drive, AirDrop, Mail…)
+    // so users can back it up without hunting for a downloaded file.
+    const file = new File([json], filename, { type: "application/json" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "Well Well Wheel backup" });
+        setStatus(`Shared backup of ${count}.`);
+        return;
+      } catch (e) {
+        // User dismissed the share sheet — quietly do nothing.
+        if ((e as Error).name === "AbortError") return;
+        // Anything else: fall through to a plain download.
+      }
+    }
+
     const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
     const a = document.createElement("a");
     a.href = url;
-    const stamp = new Date().toISOString().slice(0, 10);
-    a.download = `well-well-wheel-${stamp}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setStatus(`Exported ${blob.games.length} game${blob.games.length === 1 ? "" : "s"}.`);
+    setStatus(`Exported ${count}.`);
   }
 
   async function handleImport(file: File) {
@@ -48,7 +66,7 @@ export function Collection() {
             disabled={!games || games.length === 0}
             className="text-sm btn-sticker active:btn-sticker-active bg-white px-3 py-2 disabled:opacity-50"
           >
-            ⬇ Export JSON
+            ⬇ Export / Share
           </button>
           <button
             type="button"
